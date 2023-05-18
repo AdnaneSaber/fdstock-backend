@@ -16,46 +16,58 @@ mongo = PyMongo(app)
 
 # Create to select all images from mongoDB database and return them as json
 # [{'_id': ObjectId('6435dc1f11876970be800740'), 'image': {'id': '1', 'compressed': 'https://cdn.pixabay.com/photo/2023/03/18/16/26/ha-giang-7860907_640.jpg', 'original': 'https://cdn.pixabay.com/photo/2023/03/18/16/26/ha-giang-7860907_640.jpg', 'author': 'hamza', 'exif': 'girl, flowers, asian', 'downloads': '1', 'hasFace': True}, 'download': '1', 'view': '1'}]
+images = mongo.db.images
 
 
-@app.route('/image/<path:path>')
+@app.route('/imagesapi/<path:path>')
 def send_report(path):
     return send_from_directory('images', path)
+
 
 @app.route('/', methods=['GET'])
 @cross_origin()
 def get_images():
-    images = mongo.db.images
     output = []
+    # needs to be sorted
     for image in images.find():
-        output.append(
-            {"download": image["download"], "view": image["view"], "image": image["image"]})
+        del image['_id']
+        output.append(image)
     return jsonify(output)
 
 
 @app.route('/images/<id>', methods=['GET'])
 def get_image(id):
-    images = mongo.db.images
     output = []
-    for image in images.find({"image.id": id}):
-        output.append(
-            {"download": image["download"], "view": image["view"], "image": image["image"]})
+    for image in images.find({"id": id}):
+        del image['_id']
+        output.append(image)
     return jsonify(output)
+
+
+@app.route('/images/download/<id>', methods=['POST'])
+def add_download(id):
+    images.update_one(filter={"id": id}, update={'$inc': {'downloads': 1}})
+    return ""
+
+
+@app.route('/images/view/<id>', methods=['POST'])
+def add_view(id):
+    images.update_one(filter={"id": id}, update={'$inc': {'views': 1}})
+    return ""
 
 
 @app.route('/images/count/', methods=['GET'])
 def get_images_count():
-    images = mongo.db.images
     return jsonify({"count": images.count_documents({})})
 
 # create route to upload image to mongoDB database
+
+
 @app.route('/images/upload/', methods=['POST'])
 def upload_image():
-    images = mongo.db.images
     image = request.json['image']
     images.insert_one(image)
     return jsonify({'message': 'image uploaded'})
-
 
 
 @app.route('/disk/', methods=['GET'])
@@ -68,10 +80,10 @@ def get_disk():
     percentage = round(used / total * 100, 1)
     return jsonify({"total": f'{total}GB', "used": f'{used}GB', "free": f'{free}GB', 'percentage': percentage})
 
+
 @app.route('/images/allviews', methods=['GET'])
 @cross_origin()
 def get_all_views():
-    images = mongo.db.images
     output = []
     for image in images.find():
         output.append(
@@ -82,7 +94,6 @@ def get_all_views():
 @app.route('/images/test', methods=['GET'])
 @cross_origin()
 def create_image_test():
-    images = mongo.db.images
     images.insert_one({"image": {"id": "1", "compressed": "https://cdn.pixabay.com/photo/2023/03/18/16/26/ha-giang-7860907_640.jpg",
                       "original": "https://cdn.pixabay.com/photo/2023/03/18/16/26/ha-giang-7860907_640.jpg", "author": "hamza", "exif": "girl, flowers, asian", "downloads": "1", "hasFace": True}, "download": "1", "view": "1"})
     return jsonify({'message': 'image created'})

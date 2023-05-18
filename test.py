@@ -11,5 +11,6 @@ client = MongoClient(Mongo_server)
 db = client.PFE
 collection = db.images
 for image in images:
+    # collection.delete_many({})
     collection.insert_one(image)
 client.close()
