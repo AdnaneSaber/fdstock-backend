@@ -43,6 +43,37 @@ def get_image(id):
         output.append(image)
     return jsonify(output)
 
+@app.route("/images/search", methods=["GET"])
+def search_images():
+    gallery = request.args.get("gallery", type=bool, default=True)
+    limitstart = request.args.get("limitstart", type=int, default=0)
+    limitend = request.args.get("limitend", type=int, default=60)
+    q = request.args.get("q", type=str, default="")
+    orderby = request.args.get("orderby", type=str, default="RAND()")
+
+    query = {"exif": {"$regex" : q}}
+    if not q:
+        query = {}
+    projection = {"_id": 0}  # Exclude _id field from the result
+
+    image_data = images.find(query, projection).sort(orderby).skip(limitstart).limit(limitend)
+    image_data = list(image_data)
+
+    return jsonify(image_data)
+
+@app.route("/images/count", methods=["GET"])
+def get_image_count():
+    gallery = request.args.get("gallery", type=bool, default=True)
+    q = request.args.get("q", type=str, default="")
+
+    query = {"exif": {"$regex" : q}}
+    if not q:
+        query = {}
+
+    count = images.count_documents(query)
+
+    return jsonify({"count": count})
+
 
 @app.route('/images/download/<id>', methods=['POST'])
 def add_download(id):
@@ -63,10 +94,12 @@ def get_images_count():
 # create route to upload image to mongoDB database
 
 
+@cross_origin()
 @app.route('/images/upload/', methods=['POST'])
 def upload_image():
     image = request.json['image']
-    images.insert_one(image)
+    print(image)
+    # images.insert_one(image)
     return jsonify({'message': 'image uploaded'})
 
 
