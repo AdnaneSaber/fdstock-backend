@@ -2,10 +2,7 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_pymongo import PyMongo
 from flask_cors import CORS, cross_origin
 import shutil
-
-
-# def jsonify(data):
-#     return json.dumps(data)
+from functions import filter_request
 
 
 app = Flask(__name__)
@@ -17,6 +14,7 @@ mongo = PyMongo(app)
 # Create to select all images from mongoDB database and return them as json
 # [{'_id': ObjectId('6435dc1f11876970be800740'), 'image': {'id': '1', 'compressed': 'https://cdn.pixabay.com/photo/2023/03/18/16/26/ha-giang-7860907_640.jpg', 'original': 'https://cdn.pixabay.com/photo/2023/03/18/16/26/ha-giang-7860907_640.jpg', 'author': 'hamza', 'exif': 'girl, flowers, asian', 'downloads': '1', 'hasFace': True}, 'download': '1', 'view': '1'}]
 images = mongo.db.images
+browsers = mongo.db.browsers
 
 
 @app.route('/imagesapi/<path:path>')
@@ -43,6 +41,7 @@ def get_image(id):
         output.append(image)
     return jsonify(output)
 
+
 @app.route("/images/search", methods=["GET"])
 def search_images():
     gallery = request.args.get("gallery", type=bool, default=True)
@@ -51,22 +50,24 @@ def search_images():
     q = request.args.get("q", type=str, default="")
     orderby = request.args.get("orderby", type=str, default="RAND()")
 
-    query = {"exif": {"$regex" : q}}
+    query = {"exif": {"$regex": q}}
     if not q:
         query = {}
     projection = {"_id": 0}  # Exclude _id field from the result
 
-    image_data = images.find(query, projection).sort(orderby).skip(limitstart).limit(limitend)
+    image_data = images.find(query, projection).sort(
+        orderby).skip(limitstart).limit(limitend)
     image_data = list(image_data)
 
     return jsonify(image_data)
+
 
 @app.route("/images/count", methods=["GET"])
 def get_image_count():
     gallery = request.args.get("gallery", type=bool, default=True)
     q = request.args.get("q", type=str, default="")
 
-    query = {"exif": {"$regex" : q}}
+    query = {"exif": {"$regex": q}}
     if not q:
         query = {}
 
@@ -83,6 +84,8 @@ def add_download(id):
 
 @app.route('/images/view/<id>', methods=['POST'])
 def add_view(id):
+    browser = filter_request(request)
+    browsers.update_one(filter={"key": browser}, update={'$inc': {'value': 1}})
     images.update_one(filter={"id": id}, update={'$inc': {'views': 1}})
     return ""
 
@@ -112,6 +115,25 @@ def get_disk():
     free = round(free / (2**30), 1)
     percentage = round(used / total * 100, 1)
     return jsonify({"total": f'{total}GB', "used": f'{used}GB', "free": f'{free}GB', 'percentage': percentage})
+
+
+@app.route('/browserstats/', methods=['GET'])
+@cross_origin()
+def get_browser_stats():
+    output = []
+    B = browsers.find()
+    count = 0
+    for a in B:
+        del a['_id']
+        count += a['value']
+        print(a)
+        output.append(a)
+    for el in output:
+        el['value'] = int(el['value']) / count
+    output.append({
+        "key": "count", "value": count
+    })
+    return jsonify(output)
 
 
 @app.route('/images/allviews', methods=['GET'])

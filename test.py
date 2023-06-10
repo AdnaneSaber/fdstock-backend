@@ -9,8 +9,23 @@ images = data['images']
 # for image in images insert into mongoDB database
 client = MongoClient(Mongo_server)
 db = client.PFE
-collection = db.images
-for image in images:
-    # collection.delete_many({})
-    collection.insert_one(image)
-client.close()
+# collection = db.images
+# for image in images:
+#     # collection.delete_many({})
+#     collection.insert_one(image)
+# client.close()
+
+
+B = ["Google Chrome",
+     "Mozilla Firefox",
+     "Apple Safari",
+     "Internet Explorer",
+     "Opera",
+     "Microsoft Edge",
+     "Unknown"]
+
+browsers = db.browsers
+
+browsers.delete_many({})
+for browser in B:
+    browsers.insert_one({"key": browser, "value": 0})
