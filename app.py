@@ -47,12 +47,15 @@ def search_images():
     gallery = request.args.get("gallery", type=bool, default=True)
     limitstart = request.args.get("limitstart", type=int, default=0)
     limitend = request.args.get("limitend", type=int, default=60)
+    hasNoFace = request.args.get("hasNoFace")
     q = request.args.get("q", type=str, default="")
     orderby = request.args.get("orderby", type=str, default="RAND()")
 
     query = {"exif": {"$regex": q}}
     if not q:
         query = {}
+    if hasNoFace != "false":
+        query['hasFace'] = False
     projection = {"_id": 0}  # Exclude _id field from the result
 
     image_data = images.find(query, projection).sort(
