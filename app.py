@@ -1,14 +1,19 @@
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, flash, Response, url_for
 from flask_pymongo import PyMongo
 from flask_cors import CORS, cross_origin
+from werkzeug.utils import secure_filename
+from werkzeug.datastructures import FileStorage
+from typing import List
 import shutil
+import os
 from functions import filter_request
 
 
 app = Flask(__name__)
-cors = CORS(app)
+cors = CORS(app, resources={r'/*': {"origins": '*'}})
 app.config["MONGO_URI"] = "mongodb+srv://hamzatalhaweb7:hamza00@cluster0.sodhv1g.mongodb.net/PFE?retryWrites=true&w=majority"
 app.config['CORS_HEADERS'] = 'Content-Type'
+app.config['UPLOAD_FOLDER'] = 'uploads'
 mongo = PyMongo(app)
 
 # Create to select all images from mongoDB database and return them as json
@@ -100,13 +105,29 @@ def get_images_count():
 # create route to upload image to mongoDB database
 
 
-@cross_origin()
+UPLOAD_FOLDER = '/images'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+
+
+def allowed_file(filename: str):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
 @app.route('/images/upload/', methods=['POST'])
 def upload_image():
-    image = request.json['image']
-    print(image)
-    # images.insert_one(image)
-    return jsonify({'message': 'image uploaded'})
+    allowed_files_to_upload: List[FileStorage] = []
+    for f in request.files:
+        file = request.files.get(f)
+        if file and allowed_file(file.filename):
+
+            allowed_files_to_upload.append(file)
+        else:
+            return Response({"message": "Invalid file"}, status=400, mimetype='application/json')
+    for el in allowed_files_to_upload:
+        filename = secure_filename(el.filename)
+        el.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    return Response(status=200, mimetype='application/json')
 
 
 @app.route('/disk/', methods=['GET'])
@@ -129,7 +150,6 @@ def get_browser_stats():
     for a in B:
         del a['_id']
         count += a['value']
-        print(a)
         output.append(a)
     for el in output:
         el['value'] = int(el['value']) / count

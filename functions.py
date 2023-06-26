@@ -19,5 +19,4 @@ def filter_request(request):
         browser = 'Internet Explorer'
     else:
         browser = 'Unknown'
-    print(browser)
     return browser
