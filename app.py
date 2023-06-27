@@ -7,6 +7,7 @@ from typing import List
 import shutil
 import os
 from functions import filter_request
+from api import handleImage
 
 
 app = Flask(__name__)
@@ -23,7 +24,7 @@ browsers = mongo.db.browsers
 
 
 @app.route('/imagesapi/<path:path>')
-def send_report(path):
+def _(path):
     return send_from_directory('images', path)
 
 
@@ -117,6 +118,7 @@ def allowed_file(filename: str):
 @app.route('/images/upload/', methods=['POST'])
 def upload_image():
     allowed_files_to_upload: List[FileStorage] = []
+    exifs = request.form.get('exif')
     for f in request.files:
         file = request.files.get(f)
         if file and allowed_file(file.filename):
@@ -127,6 +129,8 @@ def upload_image():
     for el in allowed_files_to_upload:
         filename = secure_filename(el.filename)
         el.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        data = handleImage(filename, exifs)
+        images.insert_one(data)
     return Response(status=200, mimetype='application/json')
 
 

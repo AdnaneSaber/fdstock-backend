@@ -1,28 +1,26 @@
 import os
-import json
 from PIL import Image
-import piexif
-from mining import get_tags
 import face_recognition
+import shutil
+import random
 from datetime import datetime
 
-# set the directory containing the images
-image_dir = "images"
-original_dir = "imagesapi/"
-# set the directory to save the thumbnails
-thumb_dir = "imagesapi/thumbnails"
-
-# set the directory to save the compressed images
-comp_dir = "imagesapi/compressed"
-
-# set the maximum size for the thumbnails and compressed images
-max_size = (128, 128)
-
-# initialize an empty list to hold the image data
-image_data = []
 
 # loop through all the files in the directory
-for file_name in os.listdir(image_dir):
+def handleImage(file_name: str, exifs: str):
+    # set the directory containing the images
+    image_dir = "uploads"
+    original_dir = "images/"
+    # set the directory to save the thumbnails
+    thumb_dir = "images/thumbnails"
+
+    # set the directory to save the compressed images
+    comp_dir = "images/compressed"
+
+    # set the maximum size for the thumbnails and compressed images
+    max_size = (300, 300)
+    min_num = 100000000  # Minimum 9-digit number
+    max_num = 999999999    
     if file_name.endswith(".jpg") or file_name.endswith(".jpeg") or file_name.endswith(".png"):
         # initialize a dictionary to hold the data for this image
         image_dict = {"downloads": 0, "views": 0}
@@ -42,14 +40,14 @@ for file_name in os.listdir(image_dir):
                 image_dict["size"] = "portrait"
             else:
                 image_dict["size"] = "square"
-            # extract id from file_path knowing that filepath is like this: AdobeStock_583093600_Preview.jpeg and the id is the number before the underscore
-            id = file_name.split("_")[1]
+            random_number = random.randint(min_num, max_num)
+            id = str(random_number)
             name = file_name.split('.')[0]
-            image_dict["exif"] = get_tags(id)
+            image_dict["exif"] = exifs
 
             # use face_recognition library to detect faces in the image
             im = face_recognition.load_image_file(file_path)
-            face_locations = face_recognition.face_locations(im, model="cnn")
+            face_locations = face_recognition.face_locations(im)
             if len(face_locations) > 0:
                 image_dict["hasFace"] = True
             else:
@@ -63,7 +61,8 @@ for file_name in os.listdir(image_dir):
             # create a compressed version of the image
             comp_path = os.path.join(comp_dir, file_name)
             img.save(comp_path, optimize=True, quality=85)
-
+            or_dir = os.path.join(original_dir, file_name)
+            shutil.move(file_path, or_dir)
             # Get the current date and time
             current_datetime = datetime.utcnow()
 
@@ -71,18 +70,10 @@ for file_name in os.listdir(image_dir):
             date_creation = current_datetime.isoformat()
             # add other image metadata to the dictionary
             image_dict["id"] = id
-            image_dict["compressed"] = comp_path
-            image_dict["thumbnail"] = thumb_path
-            image_dict["original"] = os.path.join(original_dir, file_name)
+            image_dict["compressed"] = os.path.join("imagesapi/compressed", file_name)
+            image_dict["thumbnail"] = os.path.join("imagesapi/thumbnails", file_name)
+            image_dict["original"] = os.path.join("imagesapi/", file_name)
             image_dict["name"] = name
             image_dict["date_creation"] = date_creation
+            return image_dict
 
-            # add the image dictionary to the list of image data
-            image_data.append(image_dict)
-            print(image_dict)
-# create a JSON object containing the image data
-json_data = {"images": image_data}
-
-# output the JSON data to a file
-with open("output.json", "w") as json_file:
-    json.dump(json_data, json_file)
