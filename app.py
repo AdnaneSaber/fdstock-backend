@@ -1,19 +1,25 @@
-from flask import Flask, jsonify, request, send_from_directory, flash, Response, url_for
+from flask import Flask, jsonify, request, send_from_directory, flash, Response, url_for, make_response
 from flask_pymongo import PyMongo
 from flask_cors import CORS, cross_origin
 from werkzeug.utils import secure_filename
+from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
 from werkzeug.datastructures import FileStorage
 from typing import List
 import shutil
 import os
 from functions import filter_request
+from functools import wraps
 from api import handleImage
+import uuid
+from datetime import datetime, timedelta
 
 
 app = Flask(__name__)
-cors = CORS(app, resources={r'/*': {"origins": '*'}})
+CORS(app)
 app.config["MONGO_URI"] = "mongodb+srv://hamzatalhaweb7:hamza00@cluster0.sodhv1g.mongodb.net/PFE?retryWrites=true&w=majority"
 app.config['CORS_HEADERS'] = 'Content-Type'
+app.config['SECRET_KEY'] = 'JB$Ic&C@f^Sll5vrxr"OZ6;ymK^}B~'
 app.config['UPLOAD_FOLDER'] = 'uploads'
 mongo = PyMongo(app)
 
@@ -21,6 +27,148 @@ mongo = PyMongo(app)
 # [{'_id': ObjectId('6435dc1f11876970be800740'), 'image': {'id': '1', 'compressed': 'https://cdn.pixabay.com/photo/2023/03/18/16/26/ha-giang-7860907_640.jpg', 'original': 'https://cdn.pixabay.com/photo/2023/03/18/16/26/ha-giang-7860907_640.jpg', 'author': 'hamza', 'exif': 'girl, flowers, asian', 'downloads': '1', 'hasFace': True}, 'download': '1', 'view': '1'}]
 images = mongo.db.images
 browsers = mongo.db.browsers
+users_collection = mongo.db.users
+
+
+class User:
+    def __init__(self, public_id, name, username, email, password):
+        self.public_id = public_id
+        self.name = name
+        self.username = username
+        self.email = email
+        self.password = password
+
+    def to_dict(self):
+        return {
+            'public_id': self.public_id,
+            'name': self.name,
+            'username': self.username,
+            'email': self.email,
+            'password': self.password
+        }
+
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        # jwt is passed in the request header
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization'].split()[1]
+        # return 401 if token is not passed
+        if not token:
+            return jsonify({'message': 'Token is missing !!'}), 401
+
+        try:
+            # decoding the payload to fetch the stored details
+            data = jwt.decode(token, app.config['SECRET_KEY'])
+            current_user = User(
+                public_id=data['public_id'],
+                name='',
+                email='',
+                password=''
+            )
+        except:
+            return jsonify({
+                'message': 'Token is invalid !!'
+            }), 401
+        # returns the current logged in users context to the routes
+        return f(current_user, *args, **kwargs)
+
+    return decorated
+
+
+@app.route('/login/', methods=['POST'])
+@cross_origin()
+def login():
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        headers = {
+            'Access-Control-Allow-Origin': 'http://localhost:3000',
+            'Access-Control-Allow-Headers': 'Content-Type,Authorization',
+            'Access-Control-Allow-Methods': 'POST',
+            'Access-Control-Max-Age': '86400',  # 24 hours
+        }
+        return ('', 204, headers)
+    else:
+        # creates dictionary of form data
+        auth = request.json
+        email = auth.get('email')
+        password = auth.get('password')
+        if not auth or not email and not password:
+            # returns 401 if any email or / and password is missing
+            return make_response(
+                'Could not verify',
+                401,
+                {'WWW-Authenticate': 'Basic realm ="Login required !!"'}
+            )
+
+        user = users_collection.find_one({
+            "email": email
+        })
+        if not user:
+            # returns 401 if user does not exist
+            return make_response(
+                'Could not verify',
+                401,
+                {'WWW-Authenticate': 'Basic realm ="User does not exist !!"'}
+            )
+
+        if check_password_hash(user['password'], password):
+            # generates the JWT Token
+            token = jwt.encode({
+                'public_id': user['public_id'],
+                'exp': datetime.utcnow() + timedelta(minutes=30)
+            }, app.config['SECRET_KEY'])
+            return make_response(jsonify({'token': token, "email": email, "name": user['name'], "username": user['username'], "ability": [
+                {
+                    "action": 'manage',
+                    "subject": 'all'
+                }
+            ]}), 201)
+        # returns 403 if password is wrong
+        return make_response(
+            'Could not verify',
+            403,
+            {'WWW-Authenticate': 'Basic realm ="Wrong Password !!"'}
+        )
+
+
+@app.route('/signup/', methods=['POST'])
+def signup():
+    # creates a dictionary of the form data
+    data = request.json
+
+    # gets name, email and password
+    name, email, username = data.get('name'), data.get(
+        'email'), data.get('username')
+    password = data.get('password')
+
+    # checking for existing user
+    user = users_collection.find_one({
+        "email": email
+    })
+    if not user:
+        # database ORM object
+        user = User(
+            public_id=str(uuid.uuid4()),
+            name=name,
+            username=username,
+            email=email,
+            password=generate_password_hash(password)
+        )
+        # insert user
+        users_collection.insert_one(user.to_dict())
+
+        return make_response({"email": email, "name": name, "password": password, "username": username, "ability": [
+            {
+                "action": 'manage',
+                "subject": 'all'
+            }
+        ]}, 201)
+    else:
+        # returns 202 if user already exists
+        return make_response('User already exists. Please Log in.', 202)
 
 
 @app.route('/imagesapi/<path:path>')
@@ -183,6 +331,7 @@ def create_image_test():
 
 if __name__ == '__main__':
     app.run(
-        host="127.0.0.1",
-        port="8000"
+        host="localhost",
+        port="8000",
+        debug=True
     )
