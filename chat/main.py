@@ -100,7 +100,7 @@ def read_all_messages():
 
 
 @chat_bp.route('/messages/<chat_with>', methods=['POST'])
-def read_all_messages_with(chat_with):
+def get_all_messages_with(chat_with):
     data = request.json
     token = data.get('token')
     user_id = get_user_from_token(token, secret_key)

@@ -8,6 +8,7 @@ from chat.main import chat_bp, init_socketio_app
 from auth.main import auth_bp
 from images_app.main import images_bp
 from profile.main import profile_bp
+from events.main import events_bp
 load_dotenv()
 
 # Fetch the secret key
@@ -30,6 +31,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(images_bp)
     app.register_blueprint(profile_bp)
+    app.register_blueprint(events_bp)
     
     return app
 if __name__ == '__main__':
