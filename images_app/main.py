@@ -55,8 +55,12 @@ def search_images():
     query = {"exif": {"$regex": q}}
     if not q:
         query = {}
-    if hasNoFace != "false":
+    if hasNoFace == "true":
         query['hasFace'] = False
+    elif hasNoFace == "false":
+        query['hasFace'] = True
+    
+    
     projection = {"_id": 0}  # Exclude _id field from the result
 
     image_data = images_collection.find(query, projection).sort(
