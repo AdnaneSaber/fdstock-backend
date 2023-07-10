@@ -14,7 +14,7 @@ from db import images_collection, browsers_collection
 
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-UPLOAD_FOLDER = "../uploads"
+UPLOAD_FOLDER = "uploads"
 images_bp = Blueprint('images_handler', __name__)
 
 
@@ -126,6 +126,7 @@ def upload_image():
             return Response({"message": "Invalid file"}, status=400, mimetype='application/json')
     for el in allowed_files_to_upload:
         filename = secure_filename(el.filename)
+        print(os.path.join(UPLOAD_FOLDER, filename))
         el.save(os.path.join(UPLOAD_FOLDER, filename))
         data = handleImage(filename, exifs)
         images_collection.insert_one(data)
