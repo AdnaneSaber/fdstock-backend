@@ -4,8 +4,42 @@ import face_recognition
 import shutil
 import random
 from datetime import datetime
+import torch
+from torchvision import models, transforms
+def predict_image_name(image_path):
+    # Load the pre-trained ResNet50 model
+    model = models.resnet50(pretrained=True)
+    model.eval()
 
+    # Load and preprocess the image
+    image = Image.open(image_path)
+    preprocess = transforms.Compose([
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    input_tensor = preprocess(image)
+    input_batch = input_tensor.unsqueeze(0)
 
+    # If you have a GPU, use it for faster inference
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    input_batch = input_batch.to(device)
+    model = model.to(device)
+
+    # Perform the forward pass
+    with torch.no_grad():
+        output = model(input_batch)
+
+    # Load the ImageNet class labels
+    with open("imagenet_classes.txt") as f:
+        labels = f.readlines()
+    labels = [label.strip() for label in labels]
+
+    # Get the predicted class label
+    _, predicted_idx = torch.max(output, 1)
+    predicted_label = labels[predicted_idx.item()]
+    return predicted_label
 # loop through all the files in the directory
 def handleImage(file_name: str, exifs: str):
     # set the directory containing the images
